@@ -4,6 +4,7 @@ const AppError = require('../utils/customError');
 class PackagingService {
   /**
    * Get all packaging presets for a specific admin.
+   * (FIXED: Now returns all, not just active)
    * @param {string} adminId
    */
   async getAll(adminId) {
@@ -11,7 +12,11 @@ class PackagingService {
       .collection('admins')
       .doc(adminId)
       .collection('packagingPresets');
-    const snapshot = await presetsRef.where('active', '==', true).get();
+    
+    // --- THIS IS THE FIX ---
+    // Removed the .where('active', '==', true) to show all
+    const snapshot = await presetsRef.get();
+    // --- END FIX ---
 
     if (snapshot.empty) {
       return [];
@@ -29,7 +34,7 @@ class PackagingService {
     const preset = {
       name,
       price: Number(price),
-      active: true,
+      active: true, // Default to true
     };
 
     const newPresetRef = await db

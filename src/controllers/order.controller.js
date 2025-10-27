@@ -8,7 +8,7 @@ const catchAsync = (fn) => (req, res, next) => {
 class OrderController {
   
   create = catchAsync(async (req, res) => {
-    const { adminId } = req.auth;
+    const { adminId } = req.auth; // Passed by 'protect' middleware
     
     logger.info(`Admin ${adminId} creating new order.`);
     const newOrder = await orderService.create(adminId, req.body);
@@ -31,6 +31,20 @@ class OrderController {
     const order = await orderService.getById(adminId, id);
     res.status(200).json(order);
   });
+
+  // --- NEW METHOD ---
+  updateStatus = catchAsync(async (req, res) => {
+    const { adminId, userId } = req.auth; // Get userId too
+    const { id } = req.params; // Order ID
+    const updateData = req.body; // { newStatus, notes, reverseMetrics, restockItems, addedLosses }
+
+    logger.info(`Admin ${adminId} (User ${userId}) updating status for order ${id} to ${updateData.newStatus}`);
+    
+    const result = await orderService.updateStatus(adminId, id, updateData, userId);
+    
+    res.status(200).json(result);
+  });
+  // --- END NEW METHOD ---
 }
 
 module.exports = new OrderController();

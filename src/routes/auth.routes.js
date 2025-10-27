@@ -2,6 +2,7 @@ const express = require('express');
 const Joi = require('joi');
 const authController = require('../controllers/auth.controller');
 const validate = require('../middleware/validate.middleware');
+const { protect } = require('../middleware/auth.middleware'); // <-- 1. IMPORT PROTECT
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ router.post('/signup', validate(signupSchema), authController.signup);
 router.post('/login', validate(loginSchema), authController.login);
 
 // POST /api/auth/logout
-router.post('/logout', authController.logout); // Needs auth middleware later
+// --- 2. ADDED PROTECT MIDDLEWARE ---
+router.post('/logout', protect, authController.logout);
 
 module.exports = router;

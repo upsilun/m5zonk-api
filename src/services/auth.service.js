@@ -148,6 +148,27 @@ class AuthService {
       expiresAt: expiresAtDate.toISOString(),
     };
   }
+
+  // --- NEW FUNCTION ---
+  /**
+   * Deletes a session document from Firestore.
+   * @param {string} sessionId The document ID of the session to delete.
+   */
+  async logout(sessionId) {
+    if (!sessionId) {
+      throw new AppError('Invalid session ID.', 400);
+    }
+    
+    try {
+      const sessionRef = db.collection('sessions').doc(sessionId);
+      await sessionRef.delete();
+      return { message: 'Session deleted.' };
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw new AppError('Failed to logout.', 500);
+    }
+  }
+  // --- END NEW FUNCTION ---
 }
 
 module.exports = new AuthService();

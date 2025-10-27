@@ -23,7 +23,6 @@ class AuthController {
   login = catchAsync(async (req, res) => {
     const { email, password } = req.body;
     
-    // Get IP and country (if available, e.g., from a proxy or GeoIP service)
     const ip = req.ip; 
     const country = req.headers['x-country-code']; // Example header
 
@@ -38,13 +37,18 @@ class AuthController {
     });
   });
 
+  // --- THIS FUNCTION IS UPDATED ---
   logout = catchAsync(async (req, res) => {
-    // For a real logout, we'd delete the session from Firestore.
-    // For now, we'll just send a success message.
-    // The client should delete its token.
-    // We'll implement the /sessions/:id delete later.
-    res.status(200).json({ message: 'Logged out successfully.' });
+    // The 'protect' middleware adds req.auth.sessionId
+    const sessionId = req.auth.sessionId;
+    
+    logger.info(`Logout request for session: ${sessionId}`);
+    await authService.logout(sessionId);
+    
+    // Respond with 200 OK and a success message
+    res.status(200).json({ message: 'Logged out successfully.' }); 
   });
+  // --- END UPDATE ---
 }
 
 module.exports = new AuthController();

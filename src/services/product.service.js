@@ -1,6 +1,6 @@
 const { db, admin } = require('../config/firebase');
 const AppError = require('../utils/customError');
-const { WarehouseService } = require('./warehouse.service'); // Import the class
+const { WarehouseService } = require('./warehouse.service');
 
 const firestore = admin.firestore;
 const warehouseService = new WarehouseService();
@@ -61,7 +61,9 @@ class ProductService {
       sellPrice,
       quantityType,
       quantity,
-      perWarehouse,
+      perWarehouse, // Used to generate warehouseIds
+      imageUrl, // Make sure imageUrl is handled
+      active // Make sure active is handled
     } = productData;
 
     try {
@@ -102,27 +104,26 @@ class ProductService {
         if (grouping.mode === 'auto') {
           grouping.groupKey = groupKey;
         }
-        
-        // --- NEW LOGIC ---
+
         // Automatically create the warehouseIds array from the perWarehouse keys
         const warehouseIds = Object.keys(perWarehouse || {});
-        // --- END NEW LOGIC ---
 
         // 4. Construct the product
         const newDocRef = productsRef.doc();
         const now = firestore.FieldValue.serverTimestamp();
-        
+
         const finalProduct = {
-          ...productData,
           idCode,
+          name,
           stockPrice: Number(stockPrice),
           sellPrice: Number(sellPrice),
+          imageUrl: imageUrl || null,
           quantityType: quantityType || 'finite',
           quantity: quantityType === 'infinite' ? null : Number(quantity || 0),
-          perWarehouse: perWarehouse || {}, // Ensure this is an object
-          warehouseIds: warehouseIds, // <-- ADDED THIS FIELD
+          perWarehouse: perWarehouse || {},
+          warehouseIds: warehouseIds, // Added this field
           grouping,
-          active: productData.active !== undefined ? productData.active : true,
+          active: active !== undefined ? active : true,
           createdAt: now,
           updatedAt: now,
         };
@@ -195,17 +196,24 @@ class ProductService {
       finalUpdateData.quantity = Number(finalUpdateData.quantity);
     }
 
-    // --- NEW LOGIC ---
+    // Ensure imageUrl is set to null if passed as empty string
+    if (finalUpdateData.imageUrl === '') {
+        finalUpdateData.imageUrl = null;
+    }
+
     // If the perWarehouse map is being updated, regenerate the warehouseIds array
     if (finalUpdateData.perWarehouse) {
       finalUpdateData.warehouseIds = Object.keys(finalUpdateData.perWarehouse);
     }
-    // --- END NEW LOGIC ---
 
     finalUpdateData.updatedAt = firestore.FieldValue.serverTimestamp();
     await productRef.update(finalUpdateData);
 
-    return { id: productId, ...finalUpdateData };
+    // Return the updated fields along with the id
+    // Fetch the updated document to return complete data (optional but good practice)
+     const updatedDoc = await productRef.get();
+     return { id: updatedDoc.id, ...updatedDoc.data() };
+    // return { id: productId, ...finalUpdateData }; // simpler return if you don't need full data back
   }
 
   /**
@@ -225,7 +233,7 @@ class ProductService {
         return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       }
     }
-    
+
     // 2. If no idCode match, search by name
     if (mode === 'prefix') {
       // Firestore prefix search
@@ -273,7 +281,6 @@ class ProductService {
 
         const product = productDoc.data();
         if (product.quantityType === 'infinite') {
-          // No change needed, but we can log it if we want
           return; // Successfully did nothing
         }
 
@@ -285,16 +292,15 @@ class ProductService {
           const currentQty = product.perWarehouse?.[warehouseId]?.quantity || 0;
           newQty = currentQty + changeQty;
           if (newQty < 0) {
-            throw new AppError(`Not enough stock in warehouse ${warehouseId}.`, 400);
+            throw new AppError(`Not enough stock in warehouse ${warehouseId}. Available: ${currentQty}`, 400);
           }
-          // Use dot notation to update a field in a map
           updateField = `perWarehouse.${warehouseId}.quantity`;
         } else {
           // Global stock adjustment
           const currentQty = product.quantity || 0;
           newQty = currentQty + changeQty;
           if (newQty < 0) {
-            throw new AppError('Not enough global stock.', 400);
+            throw new AppError(`Not enough global stock. Available: ${currentQty}`, 400);
           }
           updateField = 'quantity';
         }
@@ -343,6 +349,9 @@ class ProductService {
 
     // 4. Apply limit
     const numLimit = Number(limit);
+    if (isNaN(numLimit) || numLimit <= 0 || numLimit > 100) { // Add validation
+        throw new AppError('Invalid limit parameter. Must be between 1 and 100.', 400);
+    }
     query = query.limit(numLimit);
 
     // 5. Execute query
@@ -355,7 +364,6 @@ class ProductService {
     const products = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     // 7. Determine the next cursor
-    // If we got back the exact number we asked for, there *might* be a next page
     const nextCursor =
       snapshot.docs.length === numLimit
         ? snapshot.docs[snapshot.docs.length - 1].id
@@ -365,4 +373,8 @@ class ProductService {
   }
 }
 
-module.exports = new ProductService();
+// Export both the class itself AND a pre-instantiated version
+module.exports = {
+    ProductServiceClass: ProductService, // Export the class
+    productService: new ProductService() // Export an instance
+};
