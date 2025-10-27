@@ -1,34 +1,78 @@
-🧩 M5zonk API DocumentationM5zonk API is a complete, self-contained accounting and inventory backend designed for eCommerce business owners. It is built with Node.js (Express) and uses Firebase Firestore for all data storage, including custom user authentication and session management.This system manages products, warehouses, orders, profits, packaging, and financial metrics, providing a full-service platform for business management.Tech StackBackend: Node.js, Express.jsDatabase: Firebase Firestore (using firebase-admin SDK)Authentication: Custom (Firestore-based Sessions)Validation: Joi🚀 Setup & InstallationClone the repository:git clone <your-repo-url>
-cd m5zonk-api
-Install dependencies:npm install
-Get Firebase Service Account:Go to your Firebase Project Settings > Service Accounts.Click "Generate new private key".Rename the downloaded JSON file to serviceAccountKey.json.Place this file in the root of your project directory.Create .env file:Create a file named .env in the project root and add the following line:# Server Configuration
-PORT=3000
+# 🚀 M5zonk API - Backend Documentation
 
-# Path to your Firebase credentials
-FIREBASE_SERVICE_ACCOUNT_PATH=./serviceAccountKey.json
-Run the server:# For development (with auto-reload)
-npm run dev
+## Overview
 
-# For production
-npm start
-The API will be running at http://localhost:3000.🔑 AuthenticationThis API does not use Firebase Auth. It uses a custom session system built in Firestore.You must log in via POST /api/auth/login to receive a session token.For all protected endpoints, you must include this token in an HTTP header:Header Name: X-Session-TokenHeader Value: your-64-char-session-token...Sessions are long-lived (5 months) and are refreshed (via lastSeenAt) on every API call.📖 API Endpoint DocumentationAll endpoints are prefixed with /api.1. Auth ModuleHandles user signup, login, and logout.POST /auth/signupProtection: PublicDescription: Creates a new primary "owner" account. This atomically creates the admin, user, default warehouse, settings, and packaging presets.Body:{
-  "email": "owner@business.com",
-  "password": "password123",
-  "businessName": "My eCommerce Store"
-}
-Success Response (201):{
+**M5zonk API** is a complete accounting and inventory backend for eCommerce businesses. It's built with Node.js (Express) and uses Firestore as a database for all data, including custom user accounts and sessions.
+
+This documentation details every available endpoint, its parameters, and expected responses, providing a clear guide for front-end development or API integration.
+
+**Base URL:** `http://localhost:3000/api`
+
+-----
+
+## Authentication & Global Headers
+
+All protected endpoints require a session token.
+
+### 🔑 `X-Session-Token` (Required Header)
+
+After logging in, you will receive a `token`. This token must be sent in the `X-Session-Token` header for **all endpoints** except `/auth/signup` and `/auth/login`.
+
+**Example:**
+`X-Session-Token: 2fdd70db427310f88ff91988f46bf47abf1607e3003450fb6243c33b69c945b4`
+
+-----
+
+## 1\. Authentication Module
+
+Handles user signup, login, and sessions.
+
+### `POST /auth/signup`
+
+Creates a new admin account, an "owner" user, a default warehouse, and default settings.
+
+**Request Body (`application/json`):**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `email` | `string` | **Required.** The user's email address. Must be unique. |
+| `password` | `string` | **Required.** The user's password (min 6 characters). |
+| `businessName` | `string` | **Required.** The name of the user's business. |
+
+**Success Response (201 Created):**
+
+```json
+{
   "message": "Admin account created successfully.",
   "adminId": "OHBm0jvBxJGTgIsFAG7o"
 }
-Error Response (409 Conflict):{
+```
+
+**Error Response (409 Conflict):**
+
+```json
+{
   "status": "fail",
   "message": "An account with this email already exists."
 }
-POST /auth/loginProtection: PublicDescription: Logs in a user and returns a 5-month session token.Body:{
-  "email": "owner@business.com",
-  "password": "password123"
-}
-Success Response (200):{
+```
+
+### `POST /auth/login`
+
+Logs in a user and creates a new 5-month session.
+
+**Request Body (`application/json`):**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `email` | `string` | **Required.** The user's email address. |
+| `password` | `string` | **Required.** The user's password. |
+
+**Success Response (200 OK):**
+This response contains the `token` you must use for all future authenticated requests.
+
+```json
+{
   "message": "Login successful.",
   "token": "2fdd70db427310f88ff91988f46bf47abf1607e3003450fb6243c33b69c945b4",
   "adminId": "OHBm0jvBxJGTgIsFAG7o",
@@ -36,12 +80,51 @@ Success Response (200):{
   "role": "owner",
   "expiresAt": "2026-03-27T15:23:46.306Z"
 }
-Error Response (401 Unauthorized):{
+```
+
+**Error Response (401 Unauthorized):**
+
+```json
+{
   "status": "fail",
   "message": "Invalid email or password."
 }
-POST /auth/logoutProtection: ProtectedDescription: A placeholder for logout. The client is responsible for deleting its token.Success Response (200):{ "message": "Logged out successfully." }
-2. Warehouse ModuleManages your stock locations.GET /warehousesProtection: ProtectedDescription: Lists all warehouses for your admin account.Success Response (200):[
+```
+
+### `POST /auth/logout`
+
+Logs the user out. (Note: In this MVP, it sends a success message. The client is responsible for deleting the token).
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "Logged out successfully."
+}
+```
+
+-----
+
+## 2\. Warehouse Management
+
+Manage stock locations. Requires `X-Session-Token`.
+
+### `GET /warehouses`
+
+Lists all warehouses for the admin.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Success Response (200 OK):**
+
+```json
+[
   {
     "id": "qLpM...s7dK",
     "name": "Default",
@@ -55,28 +138,79 @@ POST /auth/logoutProtection: ProtectedDescription: A placeholder for logout. The
     "createdAt": { "_seconds": 168... }
   }
 ]
-POST /warehousesProtection: ProtectedDescription: Creates a new warehouse.Body:{
-  "name": "Riyadh Branch"
-}
-Success Response (201):{
-  "id": "abc...123",
-  "name": "Riyadh Branch",
+```
+
+### `POST /warehouses`
+
+Creates a new warehouse.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Request Body (`application/json`):**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `string` | **Required.** The name of the warehouse (e.g., "Main Stockroom"). |
+
+**Success Response (201 Created):**
+
+```json
+{
+  "id": "newWarehouseId123",
+  "name": "Main Stockroom",
   "active": true
 }
-Error Response (403 Forbidden):{
-  "status": "fail",
-  "message": "Warehouse limit reached (5). Please upgrade your plan."
-}
-PUT /warehouses/:idProtection: ProtectedDescription: Updates a warehouse's name or active status.URL Params::id (string, required): The document ID of the warehouse.Body:{
-  "name": "Riyadh Branch (Updated)",
+```
+
+### `PUT /warehouses/:id`
+
+Updates the name or status of a specific warehouse.
+
+**URL Parameters:**
+
+  * `:id`: The Firestore document ID of the warehouse.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Request Body (`application/json`):** (At least one field is required)
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `string` | *Optional.* The new name for the warehouse. |
+| `active` | `boolean` | *Optional.* Set to `false` to archive the warehouse. |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "id": "newWarehouseId123",
+  "name": "Renamed Stockroom",
   "active": false
 }
-Success Response (200):{
-  "id": "abc...123",
-  "name": "Riyadh Branch (Updated)",
-  "active": false
-}
-3. Packaging Presets ModuleManages reusable packaging costs.GET /packagingProtection: ProtectedDescription: Lists all active packaging presets.Success Response (200):[
+```
+
+-----
+
+## 3\. Packaging Presets
+
+Manage reusable packaging costs. Requires `X-Session-Token`.
+
+### `GET /packaging`
+
+Lists all *active* packaging presets.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Success Response (200 OK):**
+
+```json
+[
   {
     "id": "abc...",
     "name": "Small Package",
@@ -85,164 +219,449 @@ Success Response (200):{
   },
   {
     "id": "def...",
-    "name": "Bubble Wrap",
-    "price": 0.5,
+    "name": "Medium Package",
+    "price": 5,
     "active": true
   }
 ]
-POST /packagingProtection: ProtectedDescription: Creates a new packaging preset.Body:{
-  "name": "Cardboard Box",
-  "price": 1.5
-}
-Success Response (201):{
-  "id": "xyz...789",
-  "name": "Cardboard Box",
-  "price": 1.5,
+```
+
+### `POST /packaging`
+
+Creates a new packaging preset.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Request Body (`application/json`):**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `string` | **Required.** Name of the item (e.g., "Bubble Wrap"). |
+| `price` | `number` | **Required.** Cost of this item. |
+
+**Success Response (201 Created):**
+
+```json
+{
+  "id": "newPresetId456",
+  "name": "Bubble Wrap",
+  "price": 0.5,
   "active": true
 }
-PUT /packaging/:idProtection: ProtectedDescription: Updates a preset's name, price, or active status.URL Params::id (string, required): The document ID of the preset.Body:{
-  "price": 1.75,
+```
+
+### `PUT /packaging/:id`
+
+Updates a specific packaging preset.
+
+**URL Parameters:**
+
+  * `:id`: The Firestore document ID of the preset.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Request Body (`application/json`):** (At least one field is required)
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `string` | *Optional.* The new name. |
+| `price` | `number` | *Optional.* The new price. |
+| `active` | `boolean`| *Optional.* Set to `false` to archive. |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "id": "newPresetId456",
+  "price": 0.75,
   "active": false
 }
-Success Response (200):{
-  "id": "xyz...789",
-  "price": 1.75,
-  "active": false
-}
-4. Product Management ModuleManages your inventory items.POST /productsProtection: ProtectedDescription: Creates a new product. idCode is optional and will be generated if not provided. warehouseIds is automatically generated from perWarehouse keys.Body:{
-  "name": "Blue Hoodie",
-  "stockPrice": 25,
-  "sellPrice": 50,
-  "quantityType": "finite",
-  "quantity": 100,
-  "idCode": "BH001",
+```
+
+-----
+
+## 4\. Product Management
+
+Manage inventory items. Requires `X-Session-Token`.
+
+### `POST /products`
+
+Creates a new product.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Request Body (`application/json`):**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `string` | **Required.** Product name (e.g., "Red T-Shirt"). |
+| `stockPrice` | `number` | **Required.** Cost to acquire the product (COGS). |
+| `sellPrice` | `number` | **Required.** Price to the customer. |
+| `idCode` | `string` | *Optional.* A short, unique ID (e.g., "RT001"). If not provided, a random one is generated. |
+| `quantityType`| `string` | *Optional.* `'finite'` or `'infinite'`. Defaults to `'finite'`. |
+| `quantity` | `number` | *Optional.* The global stock level. Defaults to `0`. |
+| `perWarehouse`| `object` | *Optional.* An object to track stock per warehouse. (See example below). |
+| `imageUrl` | `string` | *Optional.* A URL to the product's image. |
+| `active` | `boolean`| *Optional.* Defaults to `true`. |
+
+**`perWarehouse` Object Example:**
+
+```json
+{
   "perWarehouse": {
     "warehouseId123": { "quantityType": "finite", "quantity": 50 },
-    "warehouseId456": { "quantityType": "finite", "quantity": 50 }
+    "warehouseId456": { "quantityType": "finite", "quantity": 25 }
   }
 }
-Success Response (201):{
-  "id": "prod...123",
-  "name": "Blue Hoodie",
-  "stockPrice": 25,
-  "sellPrice": 50,
+```
+
+**Success Response (201 Created):**
+
+```json
+{
+  "id": "productDocId123",
+  "idCode": "AB12",
+  "name": "Red T-Shirt",
+  "stockPrice": 15,
+  "sellPrice": 30,
+  "quantityType": "finite",
   "quantity": 100,
-  "idCode": "BH001",
-  "warehouseIds": ["warehouseId123", "warehouseId456"],
-  "grouping": { "mode": "auto", "groupKey": "blue hoodie" },
+  "warehouseIds": [],
+  "grouping": { "mode": "auto", "groupKey": "red t-shirt" },
   "active": true,
-  "createdAt": { ... }
-}
-Error Response (409 Conflict):{
-  "status": "fail",
-  "message": "Product ID code 'BH001' is already in use."
-}
-GET /products/listProtection: ProtectedDescription: Gets a paginated list of all products, optionally filtered by warehouse.Query Params:limit (number, optional, default: 50): Number of products to return (max: 100).startAfter (string, optional): A Firestore document ID to start the next page.warehouseId (string, optional): A warehouse ID to filter by.Success Response (200):{
-  "products": [
-    { "id": "prod...123", "name": "Blue Hoodie", ... },
-    { "id": "prod...456", "name": "Red T-Shirt", ... }
-  ],
-  "nextCursor": "prod...456"
-}
-GET /products (Search)Protection: ProtectedDescription: Searches for products by idCode (exact) or name (prefix/exact).Query Params:query (string, required): The search term (e.g., "Red T" or "BH001").mode (string, optional, default: 'prefix'): prefix or exact.Success Response (200):[
-  { "id": "prod...456", "name": "Red T-Shirt", ... }
-]
-GET /products/:idProtection: ProtectedDescription: Gets a single product by its Firestore document ID.URL Params::id (string, required): The document ID of the product.Success Response (200):{ "id": "prod...456", "name": "Red T-Shirt", ... }
-PUT /products/:idProtection: ProtectedDescription: Updates a product. If perWarehouse is updated, warehouseIds is automatically recalculated.URL Params::id (string, required): The document ID of the product.Body:{
-  "sellPrice": 55,
-  "quantity": 90
-}
-Success Response (200):{
-  "id": "prod...123",
-  "sellPrice": 55,
-  "quantity": 90,
+  "createdAt": { ... },
   "updatedAt": { ... }
 }
-POST /products/:id/stock-adjustProtection: ProtectedDescription: Manually adjust stock up or down.URL Params::id (string, required): The document ID of the product.Body:{
-  "changeQty": -5,
-  "warehouseId": "warehouseId123"
+```
+
+### `GET /products/list`
+
+Lists all products with pagination, with an optional filter for a specific warehouse.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Query Parameters:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `limit` | `number` | *Optional.* Number of products to return. Default `50`, Max `100`. |
+| `startAfter`| `string` | *Optional.* A product document ID to start the next page from. (Use `nextCursor` from the previous response). |
+| `warehouseId`| `string` | *Optional.* Filters for products that exist in this specific warehouse. **Requires a Firestore Index.** |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "products": [
+    {
+      "id": "productDocId123",
+      "name": "Red T-Shirt",
+      "idCode": "AB12",
+      "sellPrice": 35
+      // ... other product fields
+    }
+    // ... (up to 'limit' products)
+  ],
+  "nextCursor": "nextProductDocId456"
 }
-Success Response (200):{
+```
+
+### `GET /products`
+
+Searches for products by `idCode` or `name`.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Query Parameters:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `query` | `string` | **Required.** The search term (e.g., "Red" or "AB12"). |
+| `mode` | `string` | *Optional.* `'prefix'` (default) or `'exact'`. |
+
+**Success Response (200 OK):**
+
+```json
+[
+  {
+    "id": "productDocId123",
+    "name": "Red T-Shirt",
+    "idCode": "AB12",
+    "sellPrice": 35
+    // ... other product fields
+  }
+]
+```
+
+### `GET /products/:id`
+
+Gets a single product by its Firestore document ID.
+
+**URL Parameters:**
+
+  * `:id`: The Firestore document ID of the product.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Success Response (200 OK):**
+Returns the full product object.
+
+### `PUT /products/:id`
+
+Updates a specific product.
+
+**URL Parameters:**
+
+  * `:id`: The Firestore document ID of the product.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Request Body (`application/json`):**
+Send any fields from the `POST /products` body. At least one field is required.
+
+**Success Response (200 OK):**
+
+```json
+{
+  "id": "productDocId123",
+  "sellPrice": 35,
+  "active": false,
+  "updatedAt": { ... }
+}
+```
+
+### `POST /products/:id/stock-adjust`
+
+Manually adds or removes stock from a product.
+
+**URL Parameters:**
+
+  * `:id`: The Firestore document ID of the product.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Request Body (`application/json`):**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `changeQty` | `number` | **Required.** The amount to change. Use `5` to add 5, use `-3` to remove 3. |
+| `warehouseId` | `string` | *Optional.* The warehouse to adjust. If omitted, adjusts the global `quantity`. |
+
+**Success Response (200 OK):**
+
+```json
+{
   "success": true,
   "message": "Stock adjusted successfully."
 }
-Error Response (400 Bad Request):{
-  "status": "fail",
-  "message": "Not enough stock in warehouse warehouseId123."
-}
-5. Order Management ModuleManages sales, calculates profit, and adjusts stock via transactions.POST /ordersProtection: ProtectedDescription: Creates a new order. This is a transactional operation that:Calculates profit (revenue, cogs, expenses).Decrements stock from the specified (or default) warehouse.Atomically updates the metricsMonthly document.Allows for a custom createdAt date for back-dating orders.Body:{
+```
+
+-----
+
+## 5\. Order Management
+
+Create and view sales orders. Requires `X-Session-Token`.
+
+### `POST /orders`
+
+Creates a new sales order. This is a transactional endpoint: it calculates profit, decrements stock, and updates financial metrics all at once.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Request Body (`application/json`):**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `lines` | `array` | **Required.** An array of `OrderLine` objects. |
+| `shippingPrice` | `number` | *Optional.* Cost for shipping. Defaults to `0`. |
+| `extraLosses` | `number` | *Optional.* Any other expenses. Defaults to `0`. |
+| `packagingItems`| `array` | *Optional.* An array of `PackagingItem` objects. |
+| `warehouseId` | `string` | *Optional.* The warehouse to pull stock from. If omitted, uses the admin's default warehouse. |
+| `createdAt` | `string` | *Optional.* An **ISO 8601 Date String** (e.g., `"2025-01-10T12:00:00.000Z"`) to back-date an order. Defaults to `now`. |
+
+**`OrderLine` Object:**
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `productId` | `string` | **Required.** The Firestore document ID of the product. |
+| `qty` | `number` | **Required.** The quantity being sold. |
+| `unitSellPrice` | `number` | *Optional.* Overrides the product's default `sellPrice`. |
+| `unitStockPrice`| `number` | *Optional.* Overrides the product's default `stockPrice`. |
+
+**`PackagingItem` Object:**
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `string` | **Required.** Name of the item (e.g., "Small Package"). |
+| `price` | `number` | **Required.** Price of the item. |
+
+**Success Response (201 Created):**
+The new order object is returned with a calculated `totals` block.
+
+```json
+{
+  "id": "newOrderId789",
+  "createdAt": { ... },
+  "warehouseId": "yourDefaultWarehouseId...",
   "lines": [
     {
-      "productId": "prod...456",
-      "qty": 2,
-      "unitSellPrice": 35
-    },
-    {
-      "productId": "prod...123",
-      "qty": 1
+      "productId": "productDocId123",
+      "idCode": "AB12",
+      "name": "Red T-Shirt",
+      "qty": 1,
+      "unitSellPrice": 35,
+      "unitStockPrice": 15
     }
   ],
   "shippingPrice": 10,
-  "extraLosses": 5,
+  "extraLosses": 0,
   "packagingItems": [
-    { "name": "Medium Package", "price": 5 }
+    { "name": "Small Package", "price": 2 }
   ],
-  "warehouseId": "warehouseId123",
-  "createdAt": "2025-01-15T10:00:00.000Z"
-}
-Success Response (201):{
-  "id": "order...789",
-  "createdAt": { "_seconds": 1736... },
-  "warehouseId": "warehouseId123",
-  "lines": [
-    { "productId": "prod...456", "name": "Red T-Shirt", "qty": 2, ... },
-    { "productId": "prod...123", "name": "Blue Hoodie", "qty": 1, ... }
-  ],
-  "shippingPrice": 10,
-  "extraLosses": 5,
-  "packagingItems": [ { "name": "Medium Package", "price": 5 } ],
   "totals": {
-    "revenue": 120,
-    "cogs": 55,
-    "expenses": 20,
-    "profit": 45,
-    "profitPct": 0.375
+    "revenue": 35,
+    "cogs": 15,
+    "expenses": 12,
+    "profit": 8,
+    "profitPct": 0.228...
   }
 }
-GET /ordersProtection: ProtectedDescription: Lists all orders, with optional filters for month or warehouse.Query Params:month (string, optional): Filter by month (e.g., 2025-10).warehouseId (string, optional): Filter by warehouse ID.Success Response (200):[
-  { "id": "order...789", ... },
-  { "id": "order...abc", ... }
-]
-GET /orders/:idProtection: ProtectedDescription: Gets a single order by its Firestore document ID.URL Params::id (string, required): The document ID of the order.Success Response (200):{ "id": "order...789", ... }
-6. Financial Metrics ModuleProvides read-only access to financial summaries.GET /metrics/year/:yearProtection: ProtectedDescription: Gets a full-year summary, including totals and a list of all monthly metric documents.URL Params::year (string, required): The year to summarize (e.g., 2025).Success Response (200):{
+```
+
+**Error Response (409 Conflict):**
+
+```json
+{
+  "status": "fail",
+  "message": "Not enough stock for Red T-Shirt. Available: 0"
+}
+```
+
+### `GET /orders`
+
+Lists all historical orders with optional filters.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Query Parameters:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `month` | `string` | *Optional.* Filters by month. Format: `"YYYY-MM"` (e.g., `"2025-01"`). |
+| `warehouseId`| `string` | *Optional.* Filters by a specific warehouse ID. |
+
+**Success Response (200 OK):**
+Returns an array of order objects.
+
+### `GET /orders/:id`
+
+Gets a single order by its Firestore document ID.
+
+**URL Parameters:**
+
+  * `:id`: The Firestore document ID of the order.
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Success Response (200 OK):**
+Returns the full order object.
+
+-----
+
+## 6\. Financial Metrics
+
+Read auto-generated financial summaries. Requires `X-Session-Token`.
+
+### `GET /metrics/year/:year`
+
+Gets a summary of all months in a given year, plus a grand total for the year.
+
+**URL Parameters:**
+
+  * `:year`: The year to query (e.g., `2025`).
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Success Response (200 OK):**
+
+```json
+{
   "year": "2025",
   "totals": {
-    "revenue": 10500,
-    "cogs": 4500,
-    "expenses": 1200,
-    "profit": 4800,
-    "orderCount": 50
+    "revenue": 525,
+    "cogs": 165,
+    "expenses": 12,
+    "profit": 348,
+    "orderCount": 2
   },
   "months": [
     {
       "month": "2025-01",
-      "revenue": 5000, ...
+      "revenue": 490,
+      "cogs": 150,
+      // ...
+      "orderCount": 1
     },
     {
-      "month": "2025-02",
-      "revenue": 5500, ...
+      "month": "2025-10",
+      "revenue": 35,
+      "cogs": 15,
+      // ...
+      "orderCount": 1
     }
   ]
 }
-GET /metrics/month/:year/:month/weeklyProtection: ProtectedDescription: Generates an on-the-fly weekly breakdown for a given month by reading and grouping all orders from that month.URL Params::year (string, required): The year (e.g., 2025).:month (string, required): The month (e.g., 10 or 01).Success Response (200):{
+```
+
+### `GET /metrics/month/:year/:month/weekly`
+
+Gets a weekly breakdown for a specific month. This is generated on-the-fly by grouping that month's orders by ISO week.
+
+**URL Parameters:**
+
+  * `:year`: The year to query (e.g., `2025`).
+  * `:month`: The month to query (e.g., `1` or `10`).
+
+**Request Headers:**
+
+  * `X-Session-Token: <your_token>`
+
+**Success Response (200 OK):**
+The keys of the `weeks` object are in `"YYYY-W##"` format.
+
+```json
+{
   "month": "2025-10",
   "weeks": {
-    "2025-W40": {
-      "revenue": 1500, "cogs": 700, "expenses": 100, "profit": 700, "orderCount": 10
-    },
-    "2025-W41": {
-      "revenue": 2000, "cogs": 900, "expenses": 150, "profit": 950, "orderCount": 12
+    "2025-W44": {
+      "revenue": 35,
+      "cogs": 15,
+      "expenses": 12,
+      "profit": 8,
+      "orderCount": 1
     }
   }
 }
-⚠️ Important: Firestore IndexesTo use the GET /api/products/list endpoint with the warehouseId filter, you must create a composite index.Run the query in Postman: GET /api/products/list?warehouseId=some-idThe API will fail, and your server console will log an error with a URL.Copy and paste that URL into your browser.Click "Create Index" in the Firebase console.The index will be:Collection: productsFields: warehouseIds (Array-Contains) ASC, createdAt (Desc)Query Scope: Collection Group
+```
